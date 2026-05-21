@@ -1,0 +1,34 @@
+# ── Configuração local (NUNCA commitar — contém credenciais) ─────────────────
+include/config.h
+*.local-only
+
+# ── Build / arduino-cli ──────────────────────────────────────────────────────
+build/
+*.bin
+*.elf
+*.map
+.cache/
+__pycache__/
+
+# ── PlatformIO (não usado em CI, mantido localmente apenas) ──────────────────
+platformio.ini.local-only
+.pio/
+.pioenvs/
+
+# ── IDEs e OS ────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+desktop.ini
+# Tooling local (não versionar)
+tools/
+*.zip
+.yamllint
+src/rs50h_thermal/config.h
+*.jsonc
+.markdownlint-cli2.jsonc
+
+install_dashboard.ps1
+backup_dashboard.ps1

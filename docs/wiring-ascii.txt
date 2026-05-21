@@ -1,0 +1,118 @@
+RS50H Thermal Controller — Pinagem e Roteamento de Cabos
+=========================================================
+Fonte da verdade para pinagem. Para diagrama vetorial: docs/wiring-schematic.svg
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  CADEIA DE ALIMENTAÇÃO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Fonte 24 VDC
+       │
+       ├──► Relé NC (SLA-24VDC-SL-C)
+       │         └── Saída NC ──► MKS XDrive VIN+ (motor ON por padrão)
+       │
+       └──► LM2596 #1 (step-down 24V → 12V)
+                 │
+                 ├──► Ventoinha 120mm PWM 12V (alimentação)
+                 │
+                 └──► LM2596 #2 (step-down 12V → 5V)
+                           │
+                           └──► ESP32-S3-Zero VIN (5V)
+                                WS2812B fita (5V)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PINAGEM ESP32-S3-Zero (Waveshare)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  GPIO | Macro       | Função              | Circuito
+  ─────┼─────────────┼─────────────────────┼──────────────────────────────
+    1  | PIN_NTC     | NTC ADC (ADC1_CH0)  | Ver divisor abaixo
+    4  | PIN_RELAY   | Gate MOSFET relay   | Ver driver de relé abaixo
+    5  | PIN_FAN_PWM | PWM 25 kHz ventoinha| Direto ao conector PWM da fan
+    9  | PIN_WS2812  | WS2812 DIN          | 330 Ω série, 5 LEDs
+   21  | —           | ⚠️ NÃO USAR         | LED onboard — boot-loop conflict
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  DIVISOR NTC (GPIO1 / ADC1_CH0)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  3.3V
+   │
+   ├── 100 kΩ (R_series / pull-up)
+   │         │
+   │         ├──[100 nF]──┐   (filtro ADC, paralelo ao NTC)
+   │         │             │
+   │         └────────────►│── GPIO1 (ADC)
+   │                       │
+   └── NTC 100 kΩ B3950   │   (instalado no estator do motor)
+             │             │
+             └─────────────┘
+                  │
+                 GND
+
+  Equação: R_ntc = 100kΩ × ADC / (4095 - ADC)
+  Steinhart-Hart (B-param): 1/T[K] = 1/T0 + (1/B) × ln(R/R0)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  DRIVER DE RELÉ (GPIO4)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  GPIO4 (3.3V lógico)
+   │
+   └── 220 Ω ──► Gate IRLZ44N
+                  │
+                  Drain ──► Bobina relé (–)
+                  Source──► GND
+
+  Bobina relé (+) ──► 24V
+  Diodo 1N4007 antiparalelo à bobina (catodo para +24V)
+
+  Lógica do relé NC (fail-safe):
+    GPIO4 = LOW  → MOSFET OFF → bobina sem energia → contato NC FECHADO → motor OK
+    GPIO4 = HIGH → MOSFET ON  → bobina energizada  → contato NC ABERTO  → motor PARA
+    Sem energia no ESP → GPIO4 flutuante → pull-down 10 kΩ força LOW → motor OK
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  VENTOINHA PWM (GPIO5)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Conector 4 pinos (PWM fans padrão):
+    Pin 1 GND    ◄── GND
+    Pin 2 +12V   ◄── LM2596 saída 12V
+    Pin 3 TACH   ─── (não conectado — não monitorado)
+    Pin 4 PWM    ◄── GPIO5 (3.3V lógico, 25 kHz, duty 0–100%)
+
+  Nota: sinal PWM 3.3V é aceito diretamente pela maioria das fans
+        PWM 4-pin. Nenhum nível de tensão adicional necessário.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  FITA WS2812B (GPIO9)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  GPIO9 ── 330 Ω ──► DIN (WS2812B LED 1)
+                          └── DOUT ──► DIN (LED 2) ──► ... ──► (LED 5)
+
+  VCC fita ◄── 5V (LM2596 #2 saída)
+  GND fita ◄── GND comum
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TOPOLOGIA COMPLETA (resumo)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  24V ─┬─ Relé NC ─────────────────────────────────── MKS VIN+
+       │       └── Bobina─┐
+       │                  └── MOSFET (GPIO4) ── GND
+       │
+       └─ LM2596 ─► 12V ─┬─ Fan (+12V)
+                          └─ LM2596 ─► 5V ─┬─ ESP32-S3 VIN
+                                            └─ WS2812B VCC
+
+  NTC ──── divisor 100kΩ + 100nF ──── GPIO1 (ADC)
+  GPIO5 ──────────────────────────── Fan PWM (25kHz)
+  GPIO9 ──── 330Ω ─────────────────── WS2812B DIN

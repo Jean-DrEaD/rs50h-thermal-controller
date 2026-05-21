@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<!--
+  dashboard-source.html — RS50H Thermal Controller v1.0.1
+  ─────────────────────────────────────────────────────────
+  FONTE EDITÁVEL do dashboard embarcado no firmware.
+  Convertido para src/rs50h_thermal/dashboard.h via scripts/ps/install_dashboard.ps1
+
+  Layout v2.0: Grid 12-col responsivo, tipografia Inter/JetBrains-Mono,
+  cards com hierarquia clara, KPIs destacados, favicon SVG inline.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>RS50H · Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='12' fill='%230d1117'/><circle cx='32' cy='32' r='22' fill='none' stroke='%23262d36' stroke-width='6'/><path d='M 14 38 A 22 22 0 0 1 50 26' fill='none' stroke='%23f59e0b' stroke-width='6' stroke-linecap='round'/><text x='32' y='40' text-anchor='middle' font-family='monospace' font-size='18' font-weight='700' fill='%23e6edf3'>50H</text></svg>"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0b0f14;--bg-soft:#0f141b;--panel:#161b22;--panel-hi:#1c232c;
+  --border:#262d36;--border-hi:#363f4a;
+  --text:#e6edf3;--text-dim:#a8b3bf;--muted:#7c8794;--dim:#525c68;
+  --amber:#f59e0b;--green:#10b981;--yellow:#eab308;
+  --red:#ef4444;--blue:#3b82f6;--purple:#a855f7;
+  --font-ui:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+  --font-mono:'JetBrains Mono','Fira Code','Courier New',monospace;
+  --r:10px;--r-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.2);
+}
+html,body{height:100%}
+body{background:radial-gradient(ellipse at top,#11161e 0%,var(--bg) 60%);
+  color:var(--text);font-family:var(--font-ui);font-size:15px;line-height:1.5;
+  min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+header{background:var(--panel);border-bottom:1px solid var(--border);
+  padding:14px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.h-bar{width:4px;height:36px;background:var(--amber);border-radius:2px}
+.h-title{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.h-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.h-right{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.badge{font-size:12px;font-weight:500;padding:5px 10px;border-radius:var(--r-sm);
+  border:1px solid var(--border-hi);color:var(--text-dim);background:var(--bg-soft);
+  display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono)}
+.badge.live{border-color:var(--green);color:var(--green);background:rgba(16,185,129,.08)}
+.badge.dis{border-color:var(--red);color:var(--red);background:rgba(239,68,68,.08)}
+.badge.auth{border-color:var(--blue);color:var(--blue);background:rgba(59,130,246,.08)}
+.dot{width:7px;height:7px;background:currentColor;border-radius:50%;
+  animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+main{flex:1;padding:20px 24px;display:grid;gap:16px;
+  grid-template-columns:repeat(12,1fr);grid-auto-rows:min-content;
+  max-width:1600px;margin:0 auto;width:100%}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);
+  padding:18px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.card.accent-am{border-top:3px solid var(--amber)}
+.card.accent-gr{border-top:3px solid var(--green)}
+.card.accent-bl{border-top:3px solid var(--blue)}
+.card.accent-pu{border-top:3px solid var(--purple)}
+.card-title{font-size:11px;font-weight:600;letter-spacing:1.2px;color:var(--muted);
+  text-transform:uppercase;margin-bottom:14px;display:flex;
+  justify-content:space-between;align-items:center}
+.card-title .meta{font-size:10px;color:var(--dim);font-weight:400;letter-spacing:.5px}
+.col-temp{grid-column:span 4}
+.col-fan{grid-column:span 5}
+.col-relay{grid-column:span 3}
+.col-chart-t{grid-column:span 8}
+.col-system{grid-column:span 4;grid-row:span 2}
+.col-chart-r{grid-column:span 8}
+.col-log{grid-column:span 12}
+@media(max-width:1100px){
+  .col-temp,.col-fan,.col-relay{grid-column:span 6}
+  .col-system{grid-column:span 6;grid-row:auto}
+  .col-chart-t,.col-chart-r{grid-column:span 12}
+}
+@media(max-width:680px){
+  main{padding:14px}
+  .col-temp,.col-fan,.col-relay,.col-system,.col-chart-t,.col-chart-r,.col-log{grid-column:span 12}
+  header{padding:12px 16px}.h-title{font-size:16px}
+}
+.tcard{display:flex;flex-direction:column;align-items:center}
+.gwrap{position:relative;width:100%;max-width:240px;aspect-ratio:1;margin:8px auto}
+.gsv{width:100%;height:100%;overflow:visible}
+.gtrack{fill:none;stroke:var(--border);stroke-width:14;stroke-linecap:round}
+.gfill{fill:none;stroke:var(--amber);stroke-width:14;stroke-linecap:round;
+  transition:stroke-dashoffset .6s ease,stroke .3s;filter:drop-shadow(0 0 6px currentColor)}
+.gcenter{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center}
+.tv{font-family:var(--font-mono);font-size:48px;font-weight:700;
+  letter-spacing:-2px;line-height:1;color:var(--text)}
+.tu{font-size:14px;color:var(--muted);margin-top:4px;font-weight:500}
+.sbadge{margin-top:12px;font-size:12px;font-weight:700;letter-spacing:1.5px;
+  padding:6px 16px;border-radius:var(--r-sm);border:1px solid;transition:all .3s}
+.si{background:rgba(59,130,246,.12);border-color:var(--blue);color:var(--blue)}
+.sw{background:rgba(16,185,129,.12);border-color:var(--green);color:var(--green)}
+.sW{background:rgba(234,179,8,.12);border-color:var(--yellow);color:var(--yellow)}
+.sc{background:rgba(239,68,68,.12);border-color:var(--red);color:var(--red)}
+.sr{background:rgba(168,85,247,.12);border-color:var(--purple);color:var(--purple)}
+.ranges{width:100%;margin-top:18px;display:flex;flex-direction:column;gap:8px}
+.rrow{display:flex;align-items:center;gap:10px;font-size:12px;padding:6px 10px;
+  border-radius:var(--r-sm);background:var(--bg-soft)}
+.rdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.rlbl{color:var(--text-dim);flex:1;font-weight:500}
+.rval{color:var(--muted);font-family:var(--font-mono);font-size:11px;font-weight:600}
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.kpi{padding:14px 16px;background:var(--bg-soft);border-radius:var(--r-sm);
+  border:1px solid var(--border)}
+.kpi-label{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.8px;
+  text-transform:uppercase;margin-bottom:6px}
+.kpi-val{font-family:var(--font-mono);font-size:32px;font-weight:700;
+  letter-spacing:-1px;line-height:1;color:var(--text)}
+.kpi-unit{font-size:14px;color:var(--muted);font-weight:500;margin-left:4px}
+.kpi-foot{font-size:11px;color:var(--dim);margin-top:6px;display:flex;
+  align-items:center;gap:6px}
+.kpi-tag{font-family:var(--font-mono);font-size:10px;padding:2px 6px;
+  border-radius:3px;border:1px solid var(--border-hi);color:var(--muted)}
+.kpi-tag.tach{border-color:var(--green);color:var(--green)}
+.kpi-tag.est{border-color:var(--yellow);color:var(--yellow)}
+.progress{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:12px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--amber),#fbbf24);
+  border-radius:4px;transition:width .5s ease;width:0%}
+.progress-fill.blue{background:linear-gradient(90deg,var(--blue),#60a5fa)}
+.scale{display:flex;justify-content:space-between;font-size:10px;
+  color:var(--dim);margin-top:6px;font-family:var(--font-mono)}
+.idle-hint{font-size:11px;color:var(--muted);text-align:center;margin-top:10px;
+  padding:8px;background:var(--bg-soft);border-radius:var(--r-sm);display:none}
+.idle-hint.show{display:block}
+.relay-block{display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:10px}
+.rcirc{width:90px;height:90px;border-radius:50%;border:3px solid;display:flex;
+  align-items:center;justify-content:center;font-family:var(--font-mono);
+  font-size:18px;font-weight:700;letter-spacing:1px;transition:all .4s}
+.rcl{border-color:var(--green);color:var(--green);
+  box-shadow:0 0 24px rgba(16,185,129,.3),inset 0 0 12px rgba(16,185,129,.1)}
+.rop{border-color:var(--red);color:var(--red);
+  box-shadow:0 0 24px rgba(239,68,68,.3),inset 0 0 12px rgba(239,68,68,.1)}
+.rlbl2{font-size:12px;color:var(--text-dim);text-align:center;line-height:1.6}
+.rlbl2 code{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.leds{display:flex;gap:8px;justify-content:center;padding:12px 0}
+.led{width:18px;height:18px;border-radius:50%;border:1px solid var(--border-hi);
+  background:var(--bg-soft);transition:all .3s}
+.led-blink{animation:ledBlink .6s step-end infinite}
+.led-pulse{animation:ledPulse 1s ease-in-out infinite}
+@keyframes ledBlink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes ledPulse{0%,100%{opacity:1}50%{opacity:.25}}
+.led-scale{font-size:11px;color:var(--muted);text-align:center;
+  font-family:var(--font-mono);margin-bottom:14px}
+.sys-list{display:flex;flex-direction:column;gap:2px}
+.sys-row{display:flex;justify-content:space-between;align-items:center;
+  padding:10px 12px;border-radius:var(--r-sm);font-size:13px;transition:background .2s}
+.sys-row:nth-child(odd){background:var(--bg-soft)}
+.sys-row:hover{background:var(--panel-hi)}
+.sys-key{color:var(--muted);font-weight:500}
+.sys-val{color:var(--text);font-family:var(--font-mono);font-weight:600}
+.sys-val.ok{color:var(--green)}.sys-val.warn{color:var(--yellow)}.sys-val.err{color:var(--red)}
+.chart-area{position:relative;width:100%;height:180px}
+.chart-area.small{height:120px}
+.chart-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.log-list{max-height:200px;overflow-y:auto;padding-right:6px;
+  display:flex;flex-direction:column;gap:4px}
+.log-line{display:flex;gap:12px;font-family:var(--font-mono);font-size:12px;
+  padding:6px 10px;border-radius:var(--r-sm);background:var(--bg-soft);
+  border-left:2px solid var(--border-hi)}
+.log-line.ok{border-left-color:var(--green)}
+.log-line.warn{border-left-color:var(--yellow)}
+.log-line.err{border-left-color:var(--red)}
+.log-ts{color:var(--dim);flex-shrink:0;font-weight:500}
+.log-msg{color:var(--text-dim);word-break:break-word}
+.log-line.ok .log-msg{color:#a7f3d0}
+.log-line.warn .log-msg{color:#fde68a}
+.log-line.err .log-msg{color:#fca5a5}
+footer{background:var(--panel);border-top:1px solid var(--border);padding:12px 24px;
+  display:flex;align-items:center;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.fsep{color:var(--border-hi)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-bar"></div>
+  <div>
+    <div class="h-title">RS50H · Thermal Controller</div>
+    <div class="h-sub">ESP32-S3-Zero · Hoverboard DirectDrive Edition</div>
+  </div>
+  <div class="h-right">
+    <span class="badge" id="bHost">rs50h-thermal.local</span>
+    <span class="badge" id="bFw">v1.0.1</span>
+    <span class="badge auth" id="bAuth">&#128274; AUTH</span>
+    <span class="badge dis" id="bWs"><span class="dot"></span>OFFLINE</span>
+  </div>
+</header>
+
+<main>
+  <section class="card accent-am col-temp tcard">
+    <div class="card-title">Temperatura &middot; Estator</div>
+    <div class="gwrap">
+      <svg class="gsv" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <circle class="gtrack" cx="100" cy="100" r="80"
+          stroke-dasharray="300 502" stroke-dashoffset="-75"
+          transform="rotate(-210 100 100)"/>
+        <circle class="gfill" id="gFill" cx="100" cy="100" r="80"
+          stroke-dasharray="300 502" stroke-dashoffset="300"
+          transform="rotate(-210 100 100)"/>
+      </svg>
+      <div class="gcenter">
+        <div class="tv" id="tVal">--.-</div>
+        <div class="tu">&deg;C</div>
+      </div>
+    </div>
+    <span class="sbadge si" id="sBadge">IDLE</span>
+    <div class="ranges">
+      <div class="rrow"><div class="rdot" style="background:var(--blue)"></div>
+        <span class="rlbl">IDLE</span><span class="rval" id="rIdle">&lt; 40&deg;C</span></div>
+      <div class="rrow"><div class="rdot" style="background:var(--green)"></div>
+        <span class="rlbl">WARMING</span><span class="rval" id="rWarm">40&ndash;60&deg;C</span></div>
+      <div class="rrow"><div class="rdot" style="background:var(--yellow)"></div>
+        <span class="rlbl">WARNING</span><span class="rval" id="rWarn">60&ndash;68&deg;C</span></div>
+      <div class="rrow"><div class="rdot" style="background:var(--red)"></div>
+        <span class="rlbl">CRITICAL &rarr; relay OFF</span><span class="rval" id="rCrit">&ge; 68&deg;C</span></div>
+      <div class="rrow"><div class="rdot" style="background:var(--purple)"></div>
+        <span class="rlbl" id="rRestLbl">RESTART (hist. 10&deg;C)</span><span class="rval" id="rRest">&lt; 58&deg;C</span></div>
+    </div>
+  </section>
+
+  <section class="card accent-am col-fan">
+    <div class="card-title">
+      <span>Ventoinha &middot; PWM 25 kHz</span>
+      <span class="meta">GPIO5 &middot; IRLZ44N</span>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">PWM Duty</div>
+        <div><span class="kpi-val" id="pVal">0</span><span class="kpi-unit">%</span></div>
+        <div class="kpi-foot"><span id="pIdleTag"></span></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Rota&ccedil;&atilde;o</div>
+        <div><span class="kpi-val" id="rpmVal">0</span><span class="kpi-unit">RPM</span></div>
+        <div class="kpi-foot">
+          <span class="kpi-tag est" id="rpmSrcTag">EST</span>
+          <span id="rpmHint">Estimado por duty</span>
+        </div>
+      </div>
+    </div>
+    <div class="progress"><div class="progress-fill" id="pFill"></div></div>
+    <div class="scale">
+      <span>0%</span>
+      <span id="pLegOn">40&deg;C</span>
+      <span id="pLegFull">60&deg;C</span>
+      <span>100%</span>
+    </div>
+    <div class="idle-hint" id="idleHint">
+      &#9432; PWM=0% comandado &mdash; fan pode girar em m&iacute;nimo de hardware (~200&ndash;400 RPM)
+    </div>
+  </section>
+
+  <section class="card accent-gr col-relay">
+    <div class="card-title">Motor +24V &middot; Relay NO</div>
+    <div class="relay-block">
+      <div class="rcirc rcl" id="rCirc">ON</div>
+      <div class="rlbl2" id="rLbl">Motor operando<br/><code>GPIO4 = HIGH</code></div>
+    </div>
+    <div class="card-title" style="margin-top:8px">LED Strip &middot; WS2812 &times;5</div>
+    <div class="leds" id="ledStrip">
+      <div class="led" id="l0"></div><div class="led" id="l1"></div>
+      <div class="led" id="l2"></div><div class="led" id="l3"></div>
+      <div class="led" id="l4"></div>
+    </div>
+    <div class="led-scale">
+      0&deg;C &rarr; <span id="ledScale">68</span>&deg;C &middot; CRIT=pisca &middot; NTC=pulsa
+    </div>
+  </section>
+
+  <section class="card col-chart-t">
+    <div class="card-title">
+      <span>Hist&oacute;rico de Temperatura</span>
+      <span class="meta">&uacute;ltimos 60 s</span>
+    </div>
+    <div class="chart-area">
+      <svg class="chart-svg" id="cSvg" viewBox="0 0 680 180" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="0" y1="150" x2="680" y2="150" stroke="#262d36" stroke-width="1"/>
+        <line x1="0" y1="112" x2="680" y2="112" stroke="#262d36" stroke-width="1"/>
+        <line x1="0" y1="75"  x2="680" y2="75"  stroke="#262d36" stroke-width="1"/>
+        <line x1="0" y1="56"  x2="680" y2="56"  stroke="rgba(239,68,68,.3)" stroke-width="1" stroke-dasharray="5 4"/>
+        <line x1="0" y1="37"  x2="680" y2="37"  stroke="#262d36" stroke-width="1"/>
+        <text x="6" y="154" font-family="monospace" font-size="11" fill="#525c68">0&deg;C</text>
+        <text x="6" y="116" id="cL40" font-family="monospace" font-size="11" fill="#525c68">40&deg;C</text>
+        <text x="6" y="79"  id="cL60" font-family="monospace" font-size="11" fill="#3b82f6">60&deg;C</text>
+        <text x="6" y="60"  id="cL68" font-family="monospace" font-size="11" fill="#ef4444">68&deg;C</text>
+        <text x="6" y="41"  font-family="monospace" font-size="11" fill="#525c68">80&deg;C</text>
+        <path id="cArea" fill="rgba(245,158,11,.1)" stroke="none"/>
+        <path id="cLine" fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </section>
+
+  <section class="card accent-bl col-system">
+    <div class="card-title">Sistema</div>
+    <div class="sys-list">
+      <div class="sys-row"><span class="sys-key">Sensor NTC</span><span class="sys-val ok" id="ntcSt">OK</span></div>
+      <div class="sys-row"><span class="sys-key">NTC faults</span><span class="sys-val" id="ntcFaults">0</span></div>
+      <div class="sys-row"><span class="sys-key">Uptime</span><span class="sys-val" id="upEl">00:00:00</span></div>
+      <div class="sys-row"><span class="sys-key">Free heap</span><span class="sys-val" id="heapEl">-- kB</span></div>
+      <div class="sys-row"><span class="sys-key">Firmware</span><span class="sys-val" id="fwEl">--</span></div>
+      <div class="sys-row"><span class="sys-key">Hardware</span><span class="sys-val" id="hwEl">--</span></div>
+      <div class="sys-row"><span class="sys-key">WebSocket</span><span class="sys-val" id="wsSt">--</span></div>
+    </div>
+  </section>
+
+  <section class="card accent-bl col-chart-r">
+    <div class="card-title">
+      <span>Hist&oacute;rico de RPM</span>
+      <span class="meta">&uacute;ltimos 60 s</span>
+    </div>
+    <div class="chart-area small">
+      <svg class="chart-svg" id="rSvg" viewBox="0 0 680 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <line x1="0" y1="85" x2="680" y2="85" stroke="#262d36" stroke-width="1"/>
+        <line x1="0" y1="50" x2="680" y2="50" stroke="#262d36" stroke-width="1"/>
+        <line x1="0" y1="15" x2="680" y2="15" stroke="#262d36" stroke-width="1"/>
+        <text x="6" y="89" font-family="monospace" font-size="11" fill="#525c68">0</text>
+        <text x="6" y="54" font-family="monospace" font-size="11" fill="#525c68" id="rL50">500</text>
+        <text x="6" y="19" font-family="monospace" font-size="11" fill="#525c68" id="rL100">1000</text>
+        <path id="rArea" fill="rgba(59,130,246,.1)" stroke="none"/>
+        <path id="rLine" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </section>
+
+  <section class="card accent-pu col-log">
+    <div class="card-title">
+      <span>Log de Eventos</span>
+      <span class="meta" id="logCount">0 eventos</span>
+    </div>
+    <div class="log-list" id="lgList"></div>
+  </section>
+</main>
+
+<footer>
+  <span><strong>RS50H</strong> Thermal Controller &middot; v1.0.1</span>
+  <span class="fsep">|</span>
+  <span>ESP32-S3-Zero</span>
+  <span class="fsep">|</span>
+  <span>MIT &copy; Jean-DrEaD</span>
+  <span style="margin-left:auto" id="fTs"></span>
+</footer>
+
+<script>
+if(!String.prototype.padStart){String.prototype.padStart=function(n,c){var s=String(this);c=c===undefined?' ':String(c);while(s.length<n)s=c+s;return s;};}
+if(!Date.now){Date.now=function(){return new Date().getTime();};}
+
+var TMIN=0,TMAX=80,TW=680,TH=180,RW=680,RH=100,RPM_MAX=1200;
+var stateMap={
+  IDLE:{cls:'si',lc:'#3b82f6'},WARMING:{cls:'sw',lc:'#10b981'},
+  WARNING:{cls:'sW',lc:'#eab308'},CRITICAL:{cls:'sc',lc:'#ef4444'},
+  RESTART:{cls:'sr',lc:'#a855f7'}
+};
+var logLines=[],hist=[],rpmHist=[],wsObj=null,reconnTimer=null;
+var _cfgApplied=false,wsToken=null,wsTokenExpiresAt=0,lastLoggedRpm=-1;
+
+function fetchWsToken(cb){
+  var xhr=new XMLHttpRequest();
+  xhr.open('GET','/ws-token',true);xhr.withCredentials=true;
+  xhr.onreadystatechange=function(){
+    if(xhr.readyState!==4)return;
+    if(xhr.status===401){cb(null,'AUTH_FAIL');return;}
+    if(xhr.status!==200){cb(null,'HTTP_'+xhr.status);return;}
+    try{
+      var j=JSON.parse(xhr.responseText);
+      wsToken=j.token;
+      wsTokenExpiresAt=Date.now()+((j.ttl_ms||600000)-30000);
+      addLog('Token WS obtido (TTL '+Math.round((j.ttl_ms||600000)/1000)+'s)','ok');
+      cb(wsToken,null);
+    }catch(e){cb(null,'PARSE_ERR:'+e);}
+  };
+  xhr.onerror=function(){cb(null,'XHR_NET_ERR');};
+  try{xhr.send();}catch(e){cb(null,'XHR_SEND_ERR:'+e);}
+}
+
+function wsConnect(){
+  if(wsToken&&Date.now()<wsTokenExpiresAt){doWsConnect(wsToken);}
+  else{
+    addLog('Solicitando token WS...','');
+    fetchWsToken(function(tok,err){
+      if(err==='AUTH_FAIL'){
+        addLog('Credenciais HTTP inv\u00e1lidas \u2014 recarregue e refa\u00e7a login','err');
+        var b=document.getElementById('bAuth');
+        if(b){b.className='badge dis';b.innerHTML='\ud83d\udd13 UNAUTHORIZED';}
+        return;
+      }
+      if(err){addLog('Token fetch falhou: '+err+' \u2014 retry 5s','err');reconnTimer=setTimeout(wsConnect,5000);return;}
+      doWsConnect(tok);
+    });
+  }
+}
+
+function doWsConnect(tok){
+  var url='ws://'+location.hostname+':81';
+  try{wsObj=new WebSocket(url);}catch(e){addLog('WebSocket n\u00e3o suportado: '+e.message,'err');return;}
+  wsObj.onopen=function(){addLog('WS aberto \u2014 enviando AUTH','');wsObj.send('AUTH '+tok);};
+  wsObj.onmessage=function(ev){
+    var d;try{d=JSON.parse(ev.data);}catch(e){addLog('JSON err: '+e,'err');return;}
+    if(d.auth==='ok'){
+      setBadge(true);
+      var el=document.getElementById('wsSt');
+      if(el){el.textContent='Conectado';el.className='sys-val ok';}
+      addLog('WS autenticado','ok');_cfgApplied=false;
+      if(reconnTimer){clearTimeout(reconnTimer);reconnTimer=null;}
+      return;
+    }
+    if(d.auth==='fail'){addLog('WS auth FAIL \u2014 renovando token','err');wsToken=null;return;}
+    applyData(d);
+  };
+  wsObj.onerror=function(){addLog('WS erro de conex\u00e3o','err');};
+  wsObj.onclose=function(){
+    setBadge(false);
+    var el=document.getElementById('wsSt');
+    if(el){el.textContent='Desconectado';el.className='sys-val err';}
+    addLog('WS desconectado \u2014 retry em 3s','warn');
+    reconnTimer=setTimeout(wsConnect,3000);
+  };
+}
+
+function applyData(d){
+  var rawT=(d.t===null||d.t===undefined)?null:parseFloat(d.t);
+  var tValid=(rawT!==null&&!isNaN(rawT));
+  var pwm=parseInt(d.pwm)||0;
+  var rpm=(d.rpm!==undefined)?(parseInt(d.rpm)||0):Math.round(pwm*10);
+  var rpmSrc=d.rpm_src||'est';
+  var state=d.state||'IDLE';
+  var relay=!!d.relay;
+  var heap=d.heap?Math.round(d.heap/1024):0;
+  var uptime=parseInt(d.uptime)||0;
+  var ntcFaults=parseInt(d.ntc_faults)||0;
+  var ntcOk=(d.ntc!==false);
+  var tCrit=(d.cfg&&d.cfg.crit)?d.cfg.crit:68;
+
+  var tValEl=document.getElementById('tVal');
+  if(tValEl)tValEl.textContent=tValid?rawT.toFixed(1):'--.-';
+  if(tValid)updateGauge(rawT,state);
+
+  var sm=stateMap[state]||stateMap['IDLE'];
+  var sb=document.getElementById('sBadge');
+  if(sb){sb.textContent=state;sb.className='sbadge '+sm.cls;}
+
+  var pValEl=document.getElementById('pVal');
+  var pFillEl=document.getElementById('pFill');
+  var pIdleTag=document.getElementById('pIdleTag');
+  var idleHintEl=document.getElementById('idleHint');
+  if(pValEl)pValEl.textContent=pwm;
+  if(pFillEl)pFillEl.style.width=pwm+'%';
+
+  var isIdleOff=(pwm===0&&state==='IDLE');
+  if(pIdleTag)pIdleTag.textContent=isIdleOff?'(IDLE)':'';
+  if(idleHintEl)idleHintEl.className='idle-hint'+(isIdleOff?' show':'');
+
+  var rpmValEl=document.getElementById('rpmVal');
+  if(rpmValEl)rpmValEl.textContent=rpm;
+
+  var srcTag=document.getElementById('rpmSrcTag');
+  var srcHint=document.getElementById('rpmHint');
+  if(rpmSrc==='tach'){
+    if(srcTag){srcTag.textContent='TACH';srcTag.className='kpi-tag tach';}
+    if(srcHint)srcHint.textContent='Medido (fio tach)';
+    if(rpm>RPM_MAX){RPM_MAX=Math.ceil(rpm*1.2/100)*100;}
+  }else{
+    if(srcTag){srcTag.textContent='EST';srcTag.className='kpi-tag est';}
+    if(srcHint)srcHint.textContent=isIdleOff?'PWM Desligado (IDLE)':'Estimado por duty';
+  }
+
+  var motorOn=!relay;
+  var rc=document.getElementById('rCirc');
+  var rl=document.getElementById('rLbl');
+  if(rc&&rl){
+    if(motorOn){rc.textContent='ON';rc.className='rcirc rcl';rl.innerHTML='Motor operando<br/><code>GPIO4 = HIGH</code>';}
+    else{rc.textContent='OFF';rc.className='rcirc rop';rl.innerHTML='Motor PARADO<br/><code>GPIO4 = LOW</code>';}
+  }
+
+  updateLEDs(state,ntcOk,tValid?rawT:null,tCrit);
+
+  var heapEl=document.getElementById('heapEl');
+  var upEl=document.getElementById('upEl');
+  var fwEl=document.getElementById('fwEl');
+  var hwEl=document.getElementById('hwEl');
+  var ntcStEl=document.getElementById('ntcSt');
+  var ntcFaultEl=document.getElementById('ntcFaults');
+  if(heapEl)heapEl.textContent=heap+' kB';
+  if(upEl)upEl.textContent=fmt(uptime);
+  if(d.fw&&fwEl){fwEl.textContent=d.fw;var b=document.getElementById('bFw');if(b)b.textContent='v'+d.fw;}
+  if(d.hw&&hwEl)hwEl.textContent=d.hw;
+  if(ntcStEl){ntcStEl.textContent=ntcOk?'OK':'FALHA';ntcStEl.className='sys-val '+(ntcOk?'ok':'err');}
+  if(ntcFaultEl){ntcFaultEl.textContent=ntcFaults;ntcFaultEl.className='sys-val '+(ntcFaults===0?'ok':ntcFaults<10?'warn':'err');}
+
+  if(tValid){hist.push(rawT);if(hist.length>60)hist.shift();renderTempChart();}
+  rpmHist.push(rpm);if(rpmHist.length>60)rpmHist.shift();renderRpmChart();
+
+  if(lastLoggedRpm<0){lastLoggedRpm=rpm;}
+  else if(Math.abs(rpm-lastLoggedRpm)>=50){
+    var dir=rpm>lastLoggedRpm?'\u2191':'\u2193';
+    addLog('RPM '+dir+' '+rpm+(rpmSrc==='tach'?' (tach)':' (est) duty='+pwm+'%'),'');
+    lastLoggedRpm=rpm;
+  }else if(rpm===0&&lastLoggedRpm>0){addLog('RPM \u2192 0 (fan IDLE / pwm=0%)','');lastLoggedRpm=0;}
+
+  var fTs=document.getElementById('fTs');
+  if(fTs)fTs.textContent=new Date().toLocaleTimeString('pt-BR');
+  if(d.cfg)applyCfg(d.cfg);
+}
+
+function applyCfg(c){
+  if(_cfgApplied)return;_cfgApplied=true;
+  var on=c.fan_on,warn=c.warn,crit=c.crit,rest=c.rest;
+  var hyst=(crit-rest).toFixed(0);
+  var ids=['rIdle','rWarm','rWarn','rCrit','rRest','rRestLbl','pLegOn','pLegFull','cL40','cL60','cL68','ledScale'];
+  var vals=['< '+on+'\u00b0C',on+'\u2013'+warn+'\u00b0C',warn+'\u2013'+crit+'\u00b0C','\u2265 '+crit+'\u00b0C','< '+rest+'\u00b0C',
+    'RESTART (hist. '+hyst+'\u00b0C)',on+'\u00b0C',warn+'\u00b0C',on+'\u00b0C',warn+'\u00b0C',crit+'\u00b0C',crit];
+  for(var i=0;i<ids.length;i++){var el=document.getElementById(ids[i]);if(el)el.textContent=vals[i];}
+  addLog('Cfg: FAN_ON='+on+' WARN='+warn+' CRIT='+crit+' REST='+rest+' (hist '+hyst+'\u00b0C)','ok');
+}
+
+function updateGauge(t,state){
+  var pct=Math.min(Math.max(t/TMAX,0),1);
+  var off=Math.round(300*(1-pct));
+  var f=document.getElementById('gFill');
+  if(!f)return;
+  f.style.strokeDashoffset=off;
+  var sm=stateMap[state]||stateMap['IDLE'];
+  f.style.stroke=sm.lc;
+}
+
+function updateLEDs(state,ntcOk,temp,tCrit){
+  var colors={IDLE:'#3b82f6',WARMING:'#10b981',WARNING:'#f59e0b',CRITICAL:'#ef4444',RESTART:'#a855f7'};
+  var base=ntcOk?(colors[state]||'#e6edf3'):'#a855f7';
+  tCrit=tCrit||68;
+  var numLit=0;
+  if(!ntcOk||state==='CRITICAL'){numLit=5;}
+  else if(temp!==null){
+    var ratio=temp/tCrit;
+    numLit=Math.min(5,Math.max(0,Math.round(ratio*5)));
+    if(numLit===0&&temp>5)numLit=1;
+  }
+  for(var i=0;i<5;i++){
+    var l=document.getElementById('l'+i);if(!l)continue;
+    l.className='led';
+    if(!ntcOk){l.style.background='#a855f7';l.style.boxShadow='0 0 10px #a855f7';l.style.borderColor='#a855f7';l.className='led led-pulse';}
+    else if(state==='CRITICAL'){l.style.background='#ef4444';l.style.boxShadow='0 0 12px #ef4444';l.style.borderColor='#ef4444';l.className='led led-blink';}
+    else if(i<numLit){l.style.background=base;l.style.boxShadow='0 0 10px '+base;l.style.borderColor=base;}
+    else{l.style.background='#0f141b';l.style.boxShadow='none';l.style.borderColor='#363f4a';}
+  }
+}
+
+function renderTempChart(){
+  if(hist.length<2)return;
+  var pts=[];
+  for(var i=0;i<hist.length;i++){
+    var x=(i/(hist.length-1))*TW;
+    var y=TH-((hist[i]-TMIN)/(TMAX-TMIN))*TH;
+    pts.push([x.toFixed(1),y.toFixed(1)]);
+  }
+  var d='';for(var j=0;j<pts.length;j++)d+=(j===0?'M':'L')+pts[j][0]+' '+pts[j][1];
+  var cl=document.getElementById('cLine'),ca=document.getElementById('cArea');
+  if(cl)cl.setAttribute('d',d);
+  if(ca)ca.setAttribute('d',d+' L'+TW+' '+TH+' L0 '+TH+' Z');
+}
+
+function renderRpmChart(){
+  if(rpmHist.length<2)return;
+  var max=Math.max(RPM_MAX,100);
+  var pts=[];
+  for(var i=0;i<rpmHist.length;i++){
+    var x=(i/(rpmHist.length-1))*RW;
+    var y=RH-(rpmHist[i]/max)*(RH-10);
+    pts.push([x.toFixed(1),Math.max(0,y).toFixed(1)]);
+  }
+  var d='';for(var j=0;j<pts.length;j++)d+=(j===0?'M':'L')+pts[j][0]+' '+pts[j][1];
+  var rl=document.getElementById('rLine'),ra=document.getElementById('rArea');
+  if(rl)rl.setAttribute('d',d);
+  if(ra)ra.setAttribute('d',d+' L'+RW+' '+RH+' L0 '+RH+' Z');
+  var half=Math.round(max/2);
+  var a=document.getElementById('rL50'),b=document.getElementById('rL100');
+  if(a)a.textContent=half;if(b)b.textContent=max;
+}
+
+function addLog(msg,type){
+  var d=new Date();
+  var ts=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2);
+  logLines.push({ts:ts,msg:msg,type:type||''});
+  if(logLines.length>60)logLines.shift();
+  var html='';
+  for(var i=logLines.length-1;i>=0;i--){
+    var l=logLines[i];
+    var cls=l.type||'';
+    html+='<div class="log-line '+cls+'"><span class="log-ts">'+l.ts+'</span><span class="log-msg">'+l.msg+'</span></div>';
+  }
+  var lg=document.getElementById('lgList');
+  if(lg)lg.innerHTML=html;
+  var lc=document.getElementById('logCount');
+  if(lc)lc.textContent=logLines.length+' eventos';
+}
+
+function setBadge(live){
+  var el=document.getElementById('bWs');if(!el)return;
+  el.className='badge '+(live?'live':'dis');
+  el.innerHTML=(live?'<span class="dot"></span>LIVE':'\u25cf OFFLINE');
+}
+
+function fmt(s){
+  var h=Math.floor(s/3600).toString().padStart(2,'0');
+  var m=Math.floor((s%3600)/60).toString().padStart(2,'0');
+  var sc=(s%60).toString().padStart(2,'0');
+  return h+':'+m+':'+sc;
+}
+
+addLog('[BOOT] RS50H Dashboard v1.0.1','ok');
+wsConnect();
+</script>
+</body>
+</html>

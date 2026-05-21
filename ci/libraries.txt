@@ -1,0 +1,13 @@
+# RS50H · Dependências de biblioteca (arduino-cli)
+# Formato: NomeDaBiblioteca@versão
+# Instaladas pelo workflow antes da compilação.
+# Versões fixas para builds reproduzíveis.
+#
+# ⚠️ Ao alterar este arquivo:
+#   - O hash muda → cache de libs é invalidado → reinstalação completa.
+#   - Os workflows fazem sanity check de FastLED e WebSockets após instalar.
+#   - Se adicionar uma nova lib OBRIGATÓRIA, inclua-a também no sanity check
+#     de build.yml e release.yml (step "Install libraries").
+
+FastLED@3.6.0
+WebSockets@2.4.1

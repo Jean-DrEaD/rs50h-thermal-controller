@@ -1,0 +1,111 @@
+name: Build Firmware
+
+on:
+  push:
+    branches: [main, develop, "fix/*", "feat/*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: arduino-cli · ESP32-S3
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install arduino-cli
+        env:
+          ARDUINO_CLI_VERSION: "1.1.1"
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            "https://github.com/arduino/arduino-cli/releases/download/v${ARDUINO_CLI_VERSION}/arduino-cli_${ARDUINO_CLI_VERSION}_Linux_64bit.tar.gz" \
+            | tar -xz -C /usr/local/bin arduino-cli
+          arduino-cli version
+
+      - name: Configure arduino-cli (ESP32 index)
+        run: |
+          set -euo pipefail
+          arduino-cli config init
+          arduino-cli config set board_manager.additional_urls \
+            https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+
+      # ⚠️ Cache split em dois: core (pesado, raramente muda) e libs (leve, muda com libraries.txt).
+      # SEM restore-keys genéricos para evitar cache "envenenado" com libs faltando.
+      - name: Cache ESP32 core
+        uses: actions/cache@v4
+        with:
+          path: ~/.arduino15
+          key: ${{ runner.os }}-arduino-core-esp32-2.0.14
+
+      - name: Cache Arduino libraries
+        uses: actions/cache@v4
+        with:
+          path: ~/Arduino/libraries
+          key: ${{ runner.os }}-arduino-libs-${{ hashFiles('ci/libraries.txt') }}
+
+      - name: Install ESP32 platform
+        # Pinado em 2.0.14 — API LEDC legada (ledcSetup/ledcAttachPin).
+        # NÃO alterar para 3.x sem atualizar o firmware: ledcSetup foi removido no core v3.
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.14
+
+      - name: Install libraries
+        run: |
+          set -euo pipefail
+          while IFS= read -r line; do
+            [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
+            echo "📦 Installing: $line"
+            arduino-cli lib install "$line"
+          done < ci/libraries.txt
+
+          echo ""
+          echo "=== Installed libraries ==="
+          arduino-cli lib list
+
+          echo ""
+          echo "=== Sanity check ==="
+          arduino-cli lib list | grep -qi "^FastLED"    || { echo "::error::FastLED não instalada"; exit 1; }
+          arduino-cli lib list | grep -qi "^WebSockets" || { echo "::error::WebSockets não instalada"; exit 1; }
+          echo "✅ Todas as bibliotecas obrigatórias presentes"
+
+      - name: Copy config.h from example
+        run: cp include/config.h.example include/config.h
+
+      - name: Strip UTF-8 BOM from source files
+        run: |
+          find src -type f \( -name "*.h" -o -name "*.cpp" -o -name "*.ino" \) \
+            -exec sed -i '1s/^\xEF\xBB\xBF//' {} +
+
+      - name: Compile firmware
+        run: |
+          set -euo pipefail
+          arduino-cli compile \
+            --fqbn esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,FlashMode=qio,FlashSize=4M,PartitionScheme=default,PSRAM=disabled \
+            --build-path "${{ github.workspace }}/build" \
+            --build-property "compiler.cpp.extra_flags=-I${{ github.workspace }}/include" \
+            "${{ github.workspace }}/src/rs50h_thermal"
+
+      - name: Rename artifacts
+        run: |
+          set -euo pipefail
+          cd "${{ github.workspace }}/build"
+          # Renomeia APENAS o firmware principal (não bootloader/partitions)
+          if [ ! -f "rs50h_thermal.ino.bin" ]; then
+            echo "::error::rs50h_thermal.ino.bin não encontrado em build/"
+            ls -lh
+            exit 1
+          fi
+          mv rs50h_thermal.ino.bin "rs50h_thermal_${{ github.ref_name }}.bin"
+          ls -lh *.bin
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rs50h-firmware-${{ github.sha }}
+          path: build/*.bin
+          if-no-files-found: error

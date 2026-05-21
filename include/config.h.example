@@ -1,0 +1,129 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+// RS50H Thermal Controller — Configuration v1.0.1
+// Copy to include/config.h and fill in your values:
+//   cp include/config.h.example include/config.h
+// config.h is gitignored — NEVER commit credentials or local overrides.
+//
+// ⚠️  SECURITY CHECKLIST antes do primeiro flash:
+//   [ ] Trocar WIFI_SSID / WIFI_PASS
+//   [ ] Trocar OTA_PASSWORD (mínimo 12 chars, random)
+//   [ ] Trocar HTTP_AUTH_USER / HTTP_AUTH_PASS (NUNCA admin/admin)
+//   [ ] Trocar AP_FALLBACK_PASS
+//   [ ] Se UDP_TOKEN_ENABLED=1, trocar UDP_SHARED_SECRET
+
+// ===== [W5] LEDC core version guard =====
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+#  error "RS50H: ESP32 core >= 3.x detectado. Migre LEDC para ledcAttach() antes de compilar, ou faça downgrade para core 2.0.14."
+#endif
+
+// ===== Identity =====
+#define HW_MODEL          "RS50H"
+#define FW_VERSION        "1.0.1"          // SemVer — keep in sync with git tag
+#define DEVICE_NAME       "rs50h-thermal"  // mDNS hostname: rs50h-thermal.local
+
+// ===== Pinout (ESP32-S3-Zero Waveshare) =====
+// NTC: ligar entre GPIO1 e GND; resistor 100 kΩ entre GPIO1 e 3V3; cap 100 nF GPIO1↔GND.
+// Sem o NTC físico, o ADC fica flutuante e o firmware entra em CRITICAL fail-safe
+// (Fan=100%, Relay=ABERTO). Esse é o comportamento esperado de segurança.
+#define PIN_NTC           1    // ADC1_CH0 — 100 kΩ pull-up divider + 100 nF cap
+#define PIN_RELAY         4    // IRLZ44N gate — 220 Ω series + 10 kΩ pull-down
+#define PIN_FAN_PWM       5    // 25 kHz PWM — 3.3 V logic direct to fan connector
+#define PIN_WS2812        9    // WS2812 data — 330 Ω series, NUM_LEDS LEDs
+// GPIO21 → DO NOT USE (onboard LED, causes boot-loop conflicts)
+
+// ===== Fan tachometer (opcional) =====
+// -1 = desabilitado (RPM estimado por duty).
+// Se o fan tiver fio tach (pino 3 do conector 4 pinos), conecte via pull-up 10 kΩ → 3V3
+// e defina o GPIO aqui. O ISR conta pulsos de borda de descida (2 pulsos/revolução).
+// Atenção: o ESP32-S3-Zero tem GPIOs com suporte a interrupção externos limitados;
+// prefira GPIOs 2, 3, 6, 7, 8, 10 (não usados pelo projeto base).
+#define PIN_FAN_TACH      -1   // -1 = estimado; ex: 6 = GPIO6 com pull-up 10 kΩ → 3V3
+
+// ===== RPM estimado (apenas quando PIN_FAN_TACH = -1) =====
+// RPM máximo estimado do fan a 100% duty. Ajuste conforme datasheet do seu fan.
+// Fans 120mm 12V típicos: 800–2000 RPM. Fans 80mm: 2000–4000 RPM.
+#define RPM_ESTIMATED_MAX 1000
+
+// ===== WS2812 LED strip =====
+#define NUM_LEDS          5
+#define LED_BRIGHTNESS    64
+
+// ===== Network =====
+#define WIFI_SSID         "your-ssid"
+#define WIFI_PASS         "your-password"
+#ifndef UDP_PORT
+#  define UDP_PORT        33333
+#endif
+#define OTA_PORT          3232
+
+// ===== [C1] OTA authentication =====
+// MÍNIMO 12 caracteres, mistura alfanumérica. NUNCA usar a mesma senha do WiFi.
+#define OTA_PASSWORD      "change-me-ota-pw-min-12-chars"
+
+// ===== [C2] HTTP/WS authentication =====
+// NUNCA usar admin/admin, admin/password, ou senhas triviais.
+#define HTTP_AUTH_USER    "change-me-user"
+#define HTTP_AUTH_PASS    "change-me-http-strong-pw"
+#define WS_TOKEN_TTL_MS   600000UL   // 10 min
+
+// ===== UDP broadcast token (OPCIONAL) =====
+#define UDP_TOKEN_ENABLED   0
+#define UDP_SHARED_SECRET   "change-me-udp-secret"
+#define UDP_TOKEN_BUCKET_MS 5000UL
+
+// ===== Serial =====
+#define SERIAL_BAUD       115200
+
+// ===== Scheduler =====
+#define SAMPLE_INTERVAL_MS   500
+#define WS_INTERVAL_MS       500
+#define UDP_INTERVAL_MS     1000
+
+// ===== [W1] WiFi reconnection =====
+#define WIFI_RECONNECT_MS  5000UL
+
+// ===== [W6] AP fallback =====
+#define AP_FALLBACK_SSID   "RS50H-Setup"
+#define AP_FALLBACK_PASS   "change-me-ap-pw"
+
+// ===== [W2] Fan policy during OTA =====
+#define OTA_FAN_DUTY_PCT  100
+
+// ===== [W3] NTC fault fail-safe =====
+#define NTC_FAULT_FAIL_SAFE_CYCLES  10   // 10 × SAMPLE_INTERVAL_MS = 5 s
+
+// ===== [M2] Task watchdog =====
+// 15 s: margem para g_ws.loop() / g_http.handleClient() sob carga de conexões.
+// (era 8 s — muito apertado para o stack WiFi do ESP32-S3 com múltiplos clientes)
+#define WDT_TIMEOUT_S      15
+
+// ===== NTC 100 kΩ B3950 @ 25 °C =====
+#define NTC_SERIES_R      100000.0f
+#define NTC_R_NOMINAL     100000.0f
+#define NTC_T_NOMINAL     25.0f
+#define NTC_B_COEFFICIENT 3950.0f
+#define NTC_SAMPLES       8
+
+// ===== Sensor validity bounds =====
+#define TEMP_MIN_VALID   -20.0f
+#define TEMP_MAX_VALID   125.0f
+
+// ===== FSM thresholds (°C) — SINGLE SOURCE OF TRUTH =====
+// Invariante obrigatória: fan_on < warn < crit  E  fan_on < rest < warn
+// Defaults: fan_on(40) < rest(58) < warn(60) < crit(68) → histerese 10 °C
+#define TEMP_FAN_ON      40.0f
+#define TEMP_WARNING     60.0f
+#define TEMP_CRITICAL    68.0f
+#define TEMP_RESTART     58.0f
+
+// ===== Bounds para validação de /config (POST runtime) =====
+// Limites absolutos aceitos pelo endpoint /config — evita configurações absurdas.
+#define CFG_MIN_TEMP      0.0f
+#define CFG_MAX_TEMP    100.0f
+
+// ===== PSRAM =====
+// ESP32-S3-Zero (Waveshare) has NO PSRAM. FQBN: PSRAM=disabled.
+
+#endif // CONFIG_H
+

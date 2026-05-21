@@ -1,0 +1,23 @@
+# ── RS50H · Line ending policy ──────────────────────────────────────────────
+# Enforce LF on all text files to prevent CRLF issues on Windows.
+# Shell scripts and hooks MUST have LF — bash refuses CRLF shebangs.
+
+* text=auto eol=lf
+
+# Force LF for critical files
+*.sh         text eol=lf
+*.bash       text eol=lf
+.githooks/*  text eol=lf
+*.yml        text eol=lf
+*.yaml       text eol=lf
+*.py         text eol=lf
+*.ino        text eol=lf
+*.h          text eol=lf
+*.md         text eol=lf
+*.txt        text eol=lf
+*.json       text eol=lf
+
+# Binaries — no conversion
+*.bin        binary
+*.elf        binary
+*.svg        text eol=lf
